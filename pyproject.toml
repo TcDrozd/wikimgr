@@ -1,0 +1,13 @@
+# pyproject.toml
+[project]
+name = "wikimgr"
+version = "0.2.0"
+dependencies = ["fastapi", "uvicorn[standard]", "httpx", "pydantic"]
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.black]
+line-length = 100
