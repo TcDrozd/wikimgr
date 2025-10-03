@@ -1,0 +1,8 @@
+{
+  "path": "automation/services/wikimgr",
+  "title": "Wiki Manager Service (wikimgr)",
+  "content_md": "# Wiki Manager Service (wikimgr)\n\nAutomates creation and updates of Wiki.js pages through a small FastAPI service with request validation, idempotency keys, path normalization, and retries.\n\n## Why\n- Keep documentation up-to-date from other systems (bots, scripts, CI).\n- Avoid manual copy/paste into Wiki.js for routine updates.\n- Provide a stable webhook-like endpoint that enforces consistency (paths, tags, etc.).\n\n## Endpoints\n- `GET /healthz`\n- `GET /readyz`\n- `POST /pages/upsert`\n",
+  "description": "Service that upserts Wiki.js pages",
+  "is_private": false,
+  "tags": ["backend","fastapi","automation","wikijs","service"]
+}

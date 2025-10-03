@@ -4,6 +4,10 @@ from .deps import require_api_key
 from .logging import setup_logging, inject_request_id
 from .models import PagePayload, UpsertResult
 from .wikijs_client import WikiJSClient, WikiError, derive_idempotency_key
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 app = FastAPI(title="Wiki Manager", version="0.2.0")
 setup_logging()

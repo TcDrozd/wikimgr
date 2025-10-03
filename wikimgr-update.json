@@ -1,0 +1,8 @@
+{
+  "path": "automation/services/wikimgr",
+  "title": "Wiki Manager Service (wikimgr)",
+  "content_md": "# Wiki Manager Service (wikimgr)\n\nAutomates creation and updates of Wiki.js pages.\n\n## Why\n- Keep docs in sync from bots/CI\n- No manual copy/paste\n\n## What It Does\n- Upsert by path + title\n- Path rules: lowercase, hyphenate, min-segment length\n- Idempotency: header or derived\n- Logging with request IDs\n\n## Endpoints\n- `GET /healthz`, `GET /readyz`\n- `POST /pages/upsert`\n\n## Environment\n- WIKIJS_BASE_URL, WIKIJS_API_TOKEN, WIKIJS_LOCALE, WIKIMGR_API_KEY (optional)\n\n## Next\n- /metrics\n- Redis idempotency cache\n- Bulk upsert jobs\n",
+  "description": "Service that upserts Wiki.js pages",
+  "is_private": false,
+  "tags": ["backend","fastapi","automation","wikijs","service"]
+}
