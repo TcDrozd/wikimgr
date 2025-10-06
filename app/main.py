@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 from .deps import require_api_key
-from .logging import setup_logging, inject_request_id
+from .log_utils import setup_logging, inject_request_id
 from .models import PagePayload, UpsertResult
 from .wikijs_client import WikiJSClient, WikiError, derive_idempotency_key
 from dotenv import load_dotenv
