@@ -8,9 +8,13 @@ import httpx
 router = APIRouter()
 
 # ---- Config ----
-UPSERT_URL = os.getenv("WKMGR_UPSERT_URL", "http://127.0.0.1:8080/upsert")
-GET_URL    = os.getenv("WKMGR_GET_URL",    "http://127.0.0.1:8080/get")
-DELETE_URL = os.getenv("WKMGR_DELETE_URL", "http://127.0.0.1:8080/delete")
+# Allow a single base URL to control internal endpoints. Individual endpoint env
+# vars still override if set. Default base matches docker-compose (port 8080).
+WKMGR_BASE_URL = os.getenv("WKMGR_BASE_URL", "http://127.0.0.1:8080").rstrip('/')
+
+UPSERT_URL = os.getenv("WKMGR_UPSERT_URL", f"{WKMGR_BASE_URL}/pages/upsert")
+GET_URL    = os.getenv("WKMGR_GET_URL",    f"{WKMGR_BASE_URL}/wikimgr/get")
+DELETE_URL = os.getenv("WKMGR_DELETE_URL", f"{WKMGR_BASE_URL}/wikimgr/delete")
 
 # Optional bearer for your wikimgr internal API
 AUTH_BEARER = os.getenv("WKMGR_BEARER", "")
@@ -175,7 +179,15 @@ async def bulk_relink(body: Dict):
         pass
 
     # naive scope: rely on an existing inventory endpoint if you have it; else bail
-    INV_URL = os.getenv("WKMGR_INVENTORY_JSON", "http://127.0.0.1:8001/wikimgr/pages/inventory.json")
+    # Inventory endpoint may be hosted on the same service or separately. Use
+    # WKMGR_INVENTORY_JSON to override; otherwise default to the same base but
+    # keep the previous path.
+    INV_URL = os.getenv("WKMGR_INVENTORY_JSON", f"{os.getenv('WKMGR_INVENTORY_JSON', '')}" )
+    if not INV_URL:
+        # default to localhost host: the inventory endpoint often lives on the
+        # same service under /wikimgr/pages/inventory.json (port 8080), but
+        # keep it configurable via WKMGR_INVENTORY_JSON.
+        INV_URL = f"{WKMGR_BASE_URL}/wikimgr/pages/inventory.json"
     async with httpx.AsyncClient(timeout=60) as c:
         r = await c.get(INV_URL, headers=HEADERS)
         if r.is_error:
