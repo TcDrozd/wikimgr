@@ -38,6 +38,7 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+.github/
 
 # Logs / temp
 logs/
@@ -75,3 +76,4 @@ coverage.xml
 .pytest_cache/
 junit*.xml
 
+.github/copilot-instructions.md
