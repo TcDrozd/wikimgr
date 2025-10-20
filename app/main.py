@@ -1,11 +1,12 @@
 from typing import Optional
 from fastapi import FastAPI, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
-from app.wikijs_api import get_single, resolve_id
+from app.wikijs_api import delete_by_id, get_single, resolve_id
 from .deps import require_api_key
 from .log_utils import setup_logging, inject_request_id
-from .models import PagePayload, UpsertResult
+from .models import DeleteReq, PagePayload, UpsertResult
 from .wikijs_client import WikiJSClient, WikiError, derive_idempotency_key
 from bulk_ops import router as bulk_ops_router
 from dotenv import load_dotenv
@@ -46,11 +47,6 @@ async def upsert_page(
     except WikiError as e:
         # Map known failures
         raise HTTPException(status_code=e.status, detail=e.message)
-
-class DeleteReq(BaseModel):
-    path: Optional[str] = None
-    id:   Optional[int] = None
-    soft: bool = True  # if true and hard delete fails, write stub (caller may do this)
 
 @app.get("/wikimgr/get")
 def wikimgr_get(path: Optional[str] = Query(default=None), id: Optional[int] = Query(default=None)):

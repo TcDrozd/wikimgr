@@ -210,3 +210,38 @@ async def bulk_relink(body: Dict):
             report["errors"].append({"path": path, "error": repr(e)})
 
     return report
+
+# Add to bulk_ops.py after the other endpoints
+@router.get("/wikimgr/pages/inventory.json")
+async def inventory_json(include_content: bool = False):
+    """
+    Returns a complete list of all pages with metadata.
+    Used by bulk-relink and other operations that need page inventory.
+    """
+    try:
+        from app.wikijs_api import refresh_index, get_single
+        
+        path_to_id = refresh_index()
+        
+        pages = []
+        for path, page_id in path_to_id.items():
+            try:
+                page_data = get_single(page_id)
+                if not include_content:
+                    page_data.pop("content", None)
+                pages.append(page_data)
+            except Exception as e:
+                pages.append({
+                    "id": page_id,
+                    "path": path, 
+                    "title": path.split("/")[-1],
+                    "error": str(e)
+                })
+        
+        return {
+            "count": len(pages),
+            "pages": pages
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Inventory generation failed: {str(e)}")
