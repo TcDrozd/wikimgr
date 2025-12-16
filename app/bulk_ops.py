@@ -32,7 +32,7 @@ async def get_page(path: str) -> Dict:
         return r.json()
 
 async def upsert_page(path: str, title: str, content: str, description: str = "") -> Dict:
-    payload = {"path": path, "title": title, "content": content, "description": description}
+    payload = {"path": path, "title": title, "content_md": content, "description": description, "tags": [], "is_private": False}
     async with httpx.AsyncClient(timeout=60) as c:
         r = await c.post(UPSERT_URL, json=payload, headers=HEADERS)
         if r.is_error:
