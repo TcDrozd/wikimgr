@@ -77,3 +77,6 @@ coverage.xml
 junit*.xml
 
 .github/copilot-instructions.md
+
+# Update and re-build script
+deploy_update.sh
