@@ -1,6 +1,6 @@
 # Wiki Manager (wikimgr)
 
-Automates creation/updates of Wiki.js pages via a FastAPI service. Includes path normalization, idempotency, tags, and locale handling.
+Automates creation/updates of Wiki.js pages via a FastAPI service. Includes path normalization, idempotency, tags, locale handling, and bulk operations for moving, redirecting, and relinking pages.
 
 ## Quick Start
 
@@ -22,6 +22,8 @@ curl -s http://localhost:8080/readyz
 ```
 
 ## API
+
+### Single Page Operations
 
 - `POST /pages/upsert` – create or update a page by path.
 
@@ -46,9 +48,71 @@ Notes:
 - Locale comes from `WIKIJS_LOCALE` (default `en`).
 - Tags are required by the Wiki.js schema; if not provided, an empty list is sent.
 
+- `GET /wikimgr/get?path=<path>&id=<id>` – retrieve a single page by path or ID.
+
+- `POST /wikimgr/delete` – delete a page (soft delete creates a redirect stub).
+
+Payload:
+```json
+{
+  "path": "old/path",
+  "id": 123,
+  "soft": true
+}
+```
+
+### Bulk Operations
+
+- `GET /wikimgr/pages/inventory.json?include_content=false` – list all pages with metadata.
+
+Returns:
+```json
+{
+  "count": 42,
+  "pages": [
+    {"id": 1, "path": "example", "title": "Example", "description": "..."}
+  ]
+}
+```
+
+- `POST /wikimgr/pages/bulk-move` – move multiple pages, optionally merging or creating redirects.
+
+Payload:
+```json
+{
+  "moves": [
+    {"from_path": "old/path", "to_path": "new/path", "merge": false}
+  ],
+  "dry_run": true
+}
+```
+
+Returns detailed report of applied/skipped/errors.
+
+- `POST /wikimgr/pages/bulk-redirect` – create redirect stubs for moved paths.
+
+Payload:
+```json
+{
+  "redirects": [
+    {"from_path": "old/path", "to_path": "new/path"}
+  ]
+}
+```
+
+- `POST /wikimgr/pages/bulk-relink` – update internal markdown links after bulk moves.
+
+Payload:
+```json
+{
+  "mapping": {"old/path": "new/path"},
+  "scope": "all"
+}
+```
+
 ## CLI Helper Script – `scripts/upsert_page.sh`
 
-A small wrapper so you don’t need to hand‑craft JSON or escape markdown.
+A small wrapper so you don't need to hand-craft JSON or escape markdown.
 
 ### Usage
 
@@ -93,7 +157,7 @@ scripts/upsert_page.sh \
   upsert-wikimgr-002
 ```
 
-> The script uses `jq -Rs` to JSON‑escape your markdown automatically, so you can write normal `.md` files and avoid manual escaping.
+> The script uses `jq -Rs` to JSON-escape your markdown automatically, so you can write normal `.md` files and avoid manual escaping.
 
 ## Makefile Targets
 
@@ -106,6 +170,12 @@ dev:    ## Dev server with reload
 
 test:   ## Run tests
 	pytest
+
+lint:   ## Lint code
+	python -m pyflakes app || true
+
+format: ## Format code
+	python -m black .
 ```
 
 ## Building an Apple Shortcut (macOS/iOS)
@@ -154,3 +224,5 @@ Yes — super straightforward. Two common approaches:
 - **GraphQL errors about tags/description**: these are required by schema; service provides defaults (`[]` and empty string) unless you override.
 - **401 from wikimgr**: set/clear `WIKIMGR_API_KEY` to match your request.
 - **404 from Wiki.js endpoint**: ensure `/graphql` on the base URL responds and the Bearer token is valid.
+- **Bulk operations fail**: check inventory endpoint first; ensure source pages exist. Use `dry_run=true` for safe testing.
+- **Link relinking misses links**: regex targets `](/path)` format; custom link formats may not be updated.
