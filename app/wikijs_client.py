@@ -2,7 +2,9 @@ import asyncio
 import hashlib
 import os
 from dataclasses import dataclass
+
 import httpx
+
 from .models import PagePayload
 
 # --- Path policy helpers ------------------------------------------------------
@@ -17,10 +19,12 @@ SEG_EXPANSIONS = {
     "ml": "machine-learning",
 }
 
+
 def normalize_path(raw: str) -> str:
     """Lowercase, strip, collapse slashes, replace spaces with hyphens."""
     parts = [p.strip().replace(" ", "-").lower() for p in raw.split("/") if p.strip()]
     return "/".join(parts)
+
 
 def enforce_path_policy(path: str) -> str:
     """Ensure each segment is at least MIN_SEG_LEN; expand common short ones.
@@ -34,15 +38,20 @@ def enforce_path_policy(path: str) -> str:
             s = SEG_EXPANSIONS.get(s.lower(), s)
         if len(s) < MIN_SEG_LEN:
             # give a clear message about which segment violates policy
-            raise WikiError(400, f"Path segment '{seg}' must be at least {MIN_SEG_LEN} characters. Consider renaming (e.g., 'AI' -> 'artificial-intelligence').")
+            raise WikiError(
+                400,
+                f"Path segment '{seg}' must be at least {MIN_SEG_LEN} characters. Consider renaming (e.g., 'AI' -> 'artificial-intelligence').",
+            )
         fixed.append(s)
     return "/".join(fixed)
+
 
 class WikiError(Exception):
     def __init__(self, status: int, message: str):
         super().__init__(message)
         self.status = status
         self.message = message
+
 
 @dataclass
 class WikiJSClient:
@@ -75,7 +84,9 @@ class WikiJSClient:
         for attempt in range(4):
             try:
                 async with httpx.AsyncClient(timeout=self.timeout_s) as client:
-                    resp = await client.post(self.graphql_url, json=payload, headers=headers)
+                    resp = await client.post(
+                        self.graphql_url, json=payload, headers=headers
+                    )
                 # GraphQL always returns 200 for app-level errors; inspect body
                 data = resp.json()
                 if "errors" in data and data["errors"]:
@@ -86,11 +97,15 @@ class WikiJSClient:
                 return data["data"]
             except httpx.RequestError as e:
                 if attempt == 3:
-                    raise WikiError(504, f"Network error talking to Wiki.js: {e}") from e
-                await asyncio.sleep(0.5 * (2 ** attempt))
+                    raise WikiError(
+                        504, f"Network error talking to Wiki.js: {e}"
+                    ) from e
+                await asyncio.sleep(0.5 * (2**attempt))
         raise WikiError(502, "Wiki.js upstream unavailable after retries")
 
-    async def get_page_by_path(self, path: str, locale: str | None = None) -> dict | None:
+    async def get_page_by_path(
+        self, path: str, locale: str | None = None
+    ) -> dict | None:
         path = enforce_path_policy(normalize_path(path))
         loc = locale or os.getenv("WIKIJS_LOCALE", "en")
         q = """
@@ -194,10 +209,13 @@ class WikiJSClient:
         # update payload path for downstream calls
         payload.path = clean_path
         # idem_key currently unused by Wiki.js; we still compute/accept it for logging/echo.
-        existing = await self.get_page_by_path(payload.path, os.getenv("WIKIJS_LOCALE", "en"))
+        existing = await self.get_page_by_path(
+            payload.path, os.getenv("WIKIJS_LOCALE", "en")
+        )
         if existing:
             return await self.update_page(existing["id"], payload)
         return await self.create_page(payload)
+
 
 def derive_idempotency_key(payload: PagePayload) -> str:
     h = hashlib.sha256()

@@ -1,15 +1,18 @@
 # wikijs_api.py
 from __future__ import annotations
-import os, json
-from typing import Optional, Dict, Any
+
+import json
+import os
+from typing import Any, Dict, Optional
+
 import httpx
 
-WIKIJS_BASE_URL   = os.getenv("WIKIJS_BASE_URL", "http://192.168.50.208:3000")
+WIKIJS_BASE_URL = os.getenv("WIKIJS_BASE_URL", "http://192.168.50.208:3000")
 GRAPHQL_URL = f"{WIKIJS_BASE_URL.rstrip('/')}/graphql"
-WIKIJS_BASE_URL  = os.getenv("WIKIJS_BASE_URL", "")
+WIKIJS_API_TOKEN = os.getenv("WIKIJS_API_TOKEN", "")
 
 HEADERS = {
-    "Authorization": f"Bearer {WIKIJS_BASE_URL}" if WIKIJS_BASE_URL else "",
+    "Authorization": f"Bearer {WIKIJS_API_TOKEN}" if WIKIJS_API_TOKEN else "",
     "Content-Type": "application/json",
     "Accept": "application/json",
 }
@@ -55,24 +58,34 @@ mutation Del($id:Int!) {
 }
 """
 
+
 def _post(query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     with httpx.Client(timeout=60) as c:
-        r = c.post(GRAPHQL_URL, headers=HEADERS, json={"query": query, "variables": variables or {}})
+        r = c.post(
+            GRAPHQL_URL,
+            headers=HEADERS,
+            json={"query": query, "variables": variables or {}},
+        )
     r.raise_for_status()
     data = r.json()
     if data.get("errors"):
         raise RuntimeError(json.dumps(data["errors"]))
     return data["data"]
 
+
 # In-process cache: path -> id
 _PATH_ID_CACHE: Dict[str, int] = {}
 
+
 def refresh_index() -> Dict[str, int]:
     data = _post(QUERY_LIST)
-    mapping = {item["path"].strip("/"): int(item["id"]) for item in data["pages"]["list"]}
+    mapping = {
+        item["path"].strip("/"): int(item["id"]) for item in data["pages"]["list"]
+    }
     _PATH_ID_CACHE.clear()
     _PATH_ID_CACHE.update(mapping)
     return _PATH_ID_CACHE
+
 
 def resolve_id(path: Optional[str] = None, id: Optional[int] = None) -> int:
     if id is not None:
@@ -97,6 +110,7 @@ def resolve_id(path: Optional[str] = None, id: Optional[int] = None) -> int:
     if norm in mapping:
         return mapping[norm]
     raise FileNotFoundError(f"Page not found: {norm}")
+
 
 def get_single(id: int) -> Dict[str, Any]:
     # try content first
@@ -131,6 +145,7 @@ def get_single(id: int) -> Dict[str, Any]:
             "updatedAt": s.get("updatedAt") or "",
             "content": s.get("contentRaw") or "",
         }
+
 
 def delete_by_id(id: int) -> bool:
     try:

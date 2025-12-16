@@ -8,7 +8,7 @@ from .deps import require_api_key
 from .log_utils import setup_logging, inject_request_id
 from .models import DeleteReq, PagePayload, UpsertResult
 from .wikijs_client import WikiJSClient, WikiError, derive_idempotency_key
-from bulk_ops import router as bulk_ops_router
+from .bulk_ops import router as bulk_ops_router
 from dotenv import load_dotenv
 
 
