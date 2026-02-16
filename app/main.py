@@ -19,6 +19,7 @@ from .bulk_ops import router as bulk_ops_router
 from .deps import require_api_key
 from .log_utils import inject_request_id, setup_logging
 from .models import DeleteReq, PagePayload, UploadPageResult, UpsertResult, BulkUploadResult
+from .routers.content import router as content_router
 from .services.upload_service import (
     bulk_upload_workflow,
     execute_upsert,
@@ -32,6 +33,7 @@ load_dotenv()
 app = FastAPI(title="Wiki Manager", version="0.2.0")
 setup_logging()
 app.include_router(bulk_ops_router, prefix="")
+app.include_router(content_router, prefix="")
 
 
 @app.middleware("http")

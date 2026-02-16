@@ -87,6 +87,20 @@ def refresh_index() -> Dict[str, int]:
     return _PATH_ID_CACHE
 
 
+def list_pages(limit: int = 1000) -> list[Dict[str, Any]]:
+    data = _post(QUERY_LIST)
+    pages = []
+    for item in data["pages"]["list"][:limit]:
+        pages.append(
+            {
+                "id": int(item["id"]),
+                "path": item["path"].strip("/"),
+                "title": item.get("title") or "",
+            }
+        )
+    return pages
+
+
 def resolve_id(path: Optional[str] = None, id: Optional[int] = None) -> int:
     if id is not None:
         return int(id)
