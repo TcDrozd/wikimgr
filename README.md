@@ -27,6 +27,8 @@ curl -s http://localhost:8080/readyz
 
 - `POST /pages/upsert` – create or update a page by path.
 - `POST /pages/upload` – upload a markdown file (`multipart/form-data`) and upsert a page.
+- `GET /content/tree` – read-only tree overview of current wiki paths.
+- `POST /content/preflight` – validate/normalize a raw path against canonical roots and get suggestions.
 
 Payload:
 ```json
@@ -50,6 +52,14 @@ Notes:
 - Tags are required by the Wiki.js schema; if not provided, an empty list is sent.
 - `content` is the preferred field for page text. `content_md` is still accepted for backward compatibility.
 
+Canonical preflight normalization rules (`/content/preflight`):
+- Strip surrounding whitespace.
+- Ensure leading `/`.
+- Collapse repeated `/`.
+- Per segment: lowercase, spaces/underscores to `-`, non `[a-z0-9-]` replaced, repeated `-` collapsed, trim `-`.
+- No trailing slash unless root (`/`).
+- Allowed roots come from `WIKIMGR_ALLOWED_ROOTS` (default: `homelab,projects,ai,personal,community,meta`).
+
 Example (send a large text file as page content):
 ```bash
 jq -Rs --arg path "notes/imports/large-text" --arg title "Large Text Import" \
@@ -59,6 +69,18 @@ jq -Rs --arg path "notes/imports/large-text" --arg title "Large Text Import" \
     -H "Content-Type: application/json" \
     -H "X-Idempotency-Key: large-text-001" \
     --data @-
+```
+
+Example tree call:
+```bash
+curl -sS "http://localhost:8080/content/tree" | jq
+```
+
+Example preflight call:
+```bash
+curl -sS -X POST "http://localhost:8080/content/preflight" \
+  -H "Content-Type: application/json" \
+  -d '{"path":"/Infra/Proxmox/GPU VM"}' | jq
 ```
 
 - `GET /wikimgr/get?path=<path>&id=<id>` – retrieve a single page by path or ID.

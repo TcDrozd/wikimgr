@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from app.core.paths import configured_allowed_roots, preflight_analysis
 from app.content_tree import build_tree
+from app.models import PreflightReq, PreflightResult
 from app.wikijs_api import list_pages
 
 router = APIRouter(prefix="/content", tags=["content"])
@@ -28,3 +30,19 @@ def content_tree():
             "root_counts": root_counts,
         },
     }
+
+
+@router.post("/preflight", response_model=PreflightResult)
+def content_preflight(req: PreflightReq):
+    try:
+        pages = list_pages(limit=1000)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"list pages failed: {e}")
+
+    existing_paths = [item.get("path", "") for item in pages if item.get("path")]
+    allowed_roots = configured_allowed_roots()
+    return preflight_analysis(
+        req.path,
+        allowed_roots=allowed_roots,
+        existing_paths=existing_paths,
+    )

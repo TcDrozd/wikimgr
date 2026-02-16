@@ -73,3 +73,17 @@ class DeleteReq(BaseModel):
     path: Optional[str] = None
     id: Optional[int] = None
     soft: bool = True  # if true, replace with moved stub instead of deleting
+
+
+class PreflightReq(BaseModel):
+    path: str = Field(..., description="Raw wiki path to validate and normalize.")
+
+
+class PreflightResult(BaseModel):
+    input: str
+    normalized: str
+    is_valid_root: bool
+    root: str | None = None
+    allowed_roots: list[str] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
