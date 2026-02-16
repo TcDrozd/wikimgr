@@ -87,3 +87,14 @@ class PreflightResult(BaseModel):
     allowed_roots: list[str] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class ContentTreeStats(BaseModel):
+    page_count: int
+    root_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class ContentTreeResult(BaseModel):
+    roots: dict[str, dict] = Field(default_factory=dict)
+    tree_text: str
+    stats: ContentTreeStats

@@ -13,6 +13,9 @@ pip install -e .
 cp .env.example .env   # then fill in values
 export $(cat .env | xargs) # or use `direnv`
 
+# Optional: canonical roots used by /content/preflight
+# WIKIMGR_ALLOWED_ROOTS=homelab,projects,ai,personal,community,meta
+
 # 3) Run
 make dev    # uvicorn app.main:app --reload --port 8080
 

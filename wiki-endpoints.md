@@ -6,8 +6,18 @@ This document reflects the current `wikimgr` service behavior.
 - `Content-Type: application/json` for JSON endpoints.
 - `Content-Type: multipart/form-data` for upload endpoints.
 - `X-API-Key: <value>` optional, only required when `WIKIMGR_API_KEY` is set.
-- `X-Idempotency-Key: <value>` optional for `POST /pages/upsert`.
+- `X-Idempotency-Key: <value>` optional for `POST /pages/upsert` and `POST /pages/upload`.
 - Legacy compatibility: `x_idempotency_key` (underscore) is also accepted.
+
+## Canonical Path Preflight Rules
+Used by `POST /content/preflight`:
+- Strip surrounding whitespace.
+- Ensure leading `/`.
+- Collapse repeated `/`.
+- Per segment: lowercase, spaces/underscores to `-`, replace non `[a-z0-9-]`, collapse repeated `-`, trim `-`.
+- No trailing slash unless root (`/`).
+- Allowed roots are loaded from `WIKIMGR_ALLOWED_ROOTS` (CSV), default:
+  `homelab,projects,ai,personal,community,meta`.
 
 ## Health
 
@@ -140,12 +150,6 @@ Response `200`:
 ```
 
 Errors:
-- `400` bad file inputs (missing files/base_path, invalid extension/UTF-8 per file metadata checks).
-- `401` API key invalid/missing (when enabled).
-- `413` payload too large (enforced by runtime/proxy config).
-- `422` malformed multipart/form-data shape (FastAPI request validation).
-
-Errors:
 - `404` page not found
 - `500` upstream/other error
 
@@ -168,6 +172,75 @@ Response `200`:
 Notes:
 - If upstream role/version disallows delete, service may return `ok: false`.
 - `soft` exists in the request model but is not currently acted on by handler logic.
+
+## Content Discovery / Preflight
+
+### `GET /content/tree`
+Returns a deterministic path tree from Wiki.js page paths (`id`, `path`, `title` source data).
+
+Response `200`:
+```json
+{
+  "roots": {
+    "ai": {
+      "ollama": {}
+    },
+    "homelab": {
+      "gpu-vm": {},
+      "network": {}
+    }
+  },
+  "stats": {
+    "page_count": 3,
+    "root_counts": {
+      "ai": 1,
+      "homelab": 2
+    }
+  }
+}
+```
+
+Notes:
+- Tree nodes are nested dictionaries keyed by path segment.
+- Empty path segments are ignored.
+- Segment ordering is alphabetical for deterministic output.
+
+Errors:
+- `502` failed to fetch/list pages from Wiki.js upstream.
+
+### `POST /content/preflight`
+Validate and normalize a raw path against canonical roots, then return suggestions.
+
+Body:
+```json
+{ "path": "/Infra/Proxmox/GPU VM" }
+```
+
+Response `200`:
+```json
+{
+  "input": "/Infra/Proxmox/GPU VM",
+  "normalized": "/infra/proxmox/gpu-vm",
+  "is_valid_root": false,
+  "root": "infra",
+  "allowed_roots": ["homelab", "projects", "ai", "personal", "community", "meta"],
+  "suggestions": [
+    "/homelab/proxmox/gpu-vm",
+    "/homelab/proxmox/cluster"
+  ],
+  "warnings": [
+    "Root 'infra' is not in allowed roots."
+  ]
+}
+```
+
+Notes:
+- Does not create, move, or update pages. Preflight only.
+- Suggestions include simple keyword-based root hints and existing-path near matches.
+
+Errors:
+- `422` invalid request shape.
+- `502` failed to fetch/list pages from Wiki.js upstream.
 
 ## Bulk Operations
 

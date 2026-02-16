@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.content_tree import build_tree
+from app.content_tree import build_tree, render_tree_text
 from app.main import app
 
 
@@ -23,6 +23,22 @@ def test_build_tree_ignores_empty_segments_and_sorts():
     assert list(tree["homelab"].keys()) == ["gpu-vm", "network"]
 
 
+def test_render_tree_text():
+    tree = {
+        "ai": {"ollama": {}},
+        "homelab": {"gpu-vm": {}, "network": {}},
+    }
+    text = render_tree_text(tree)
+    assert text.splitlines() == [
+        ".",
+        "|-- ai",
+        "|   `-- ollama",
+        "`-- homelab",
+        "    |-- gpu-vm",
+        "    `-- network",
+    ]
+
+
 def test_content_tree_endpoint(monkeypatch):
     fake_pages = [
         {"id": 1, "path": "homelab/gpu-vm", "title": "GPU VM"},
@@ -42,6 +58,8 @@ def test_content_tree_endpoint(monkeypatch):
     assert body["stats"]["root_counts"] == {"ai": 1, "homelab": 2}
     assert sorted(body["roots"].keys()) == ["ai", "homelab"]
     assert sorted(body["roots"]["homelab"].keys()) == ["gpu-vm", "network"]
+    assert body["tree_text"].startswith(".\n")
+    assert "|-- ai" in body["tree_text"]
 
 
 def test_content_preflight_endpoint(monkeypatch):

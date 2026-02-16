@@ -3,14 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.core.paths import configured_allowed_roots, preflight_analysis
-from app.content_tree import build_tree
-from app.models import PreflightReq, PreflightResult
+from app.content_tree import build_tree, render_tree_text
+from app.models import ContentTreeResult, PreflightReq, PreflightResult
 from app.wikijs_api import list_pages
 
 router = APIRouter(prefix="/content", tags=["content"])
 
 
-@router.get("/tree")
+@router.get("/tree", response_model=ContentTreeResult)
 def content_tree():
     try:
         pages = list_pages(limit=1000)
@@ -25,6 +25,7 @@ def content_tree():
 
     return {
         "roots": tree,
+        "tree_text": render_tree_text(tree),
         "stats": {
             "page_count": len(paths),
             "root_counts": root_counts,
