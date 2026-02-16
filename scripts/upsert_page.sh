@@ -6,7 +6,7 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Usage: $0 <path-slug> <title> <markdown-file> [description] [tags-json]
+Usage: $0 <path-slug> <title> <text-file> [description] [tags-json]
 EOF
   exit 1
 }
@@ -17,7 +17,7 @@ fi
 
 PATH_SLUG="$1"
 TITLE="$2"
-MD_FILE="$3"
+TEXT_FILE="$3"
 DESC="${4:-}"
 TAGS_JSON="${5:-[]}"
 
@@ -29,7 +29,7 @@ fi
 make_payload() {
   local path_slug="$1"; shift
   local title="$1"; shift
-  local md_file="$1"; shift
+  local text_file="$1"; shift
   local desc="$1"; shift
   local tags_json="$1"; shift
 
@@ -42,28 +42,28 @@ make_payload() {
       {
         path: $path,
         title: $title,
-        content_md: .,
+        content: .,
         description: $desc,
         is_private: false,
         tags: $tags
       }
-    ' "$md_file" > /tmp/wikimgr_payload.json
+    ' "$text_file" > /tmp/wikimgr_payload.json
   else
-    /usr/bin/python3 - "$path_slug" "$title" "$md_file" "$desc" "$tags_json" <<'PY'
+    /usr/bin/python3 - "$path_slug" "$title" "$text_file" "$desc" "$tags_json" <<'PY'
 import json, sys
-path, title, md_file, desc, tags_json = sys.argv[1:]
+path, title, text_file, desc, tags_json = sys.argv[1:]
 try:
     tags = json.loads(tags_json)
     if not isinstance(tags, list):
         raise ValueError
 except Exception:
     tags = []
-with open(md_file, 'r', encoding='utf-8') as f:
+with open(text_file, 'r', encoding='utf-8') as f:
     content = f.read()
 obj = {
     "path": path,
     "title": title,
-    "content_md": content,
+    "content": content,
     "description": desc,
     "is_private": False,
     "tags": tags,
@@ -80,7 +80,7 @@ if [[ -n "${WIKIMGR_API_KEY:-}" ]]; then
   API_KEY_HEADER='-H "X-API-Key: '"${WIKIMGR_API_KEY}"'"'
 fi
 
-make_payload "$PATH_SLUG" "$TITLE" "$MD_FILE" "$DESC" "$TAGS_JSON"
+make_payload "$PATH_SLUG" "$TITLE" "$TEXT_FILE" "$DESC" "$TAGS_JSON"
 
 IDEMP=$(uuidgen)
 

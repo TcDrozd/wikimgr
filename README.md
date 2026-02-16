@@ -32,7 +32,7 @@ Payload:
 {
   "path": "automation/services/wikimgr",
   "title": "Wiki Manager Service (wikimgr)",
-  "content_md": "# ...markdown...",
+  "content": "Any large text block (markdown, plain text, logs, etc.)",
   "description": "Short summary",
   "is_private": false,
   "tags": ["backend","fastapi","automation"]
@@ -47,6 +47,18 @@ Notes:
 - Path is normalized to lowercase, spaces→`-`, and each segment must be ≥ 3 chars. Common short segments are expanded (e.g. `ai`→`artificial-intelligence`).
 - Locale comes from `WIKIJS_LOCALE` (default `en`).
 - Tags are required by the Wiki.js schema; if not provided, an empty list is sent.
+- `content` is the preferred field for page text. `content_md` is still accepted for backward compatibility.
+
+Example (send a large text file as page content):
+```bash
+jq -Rs --arg path "notes/imports/large-text" --arg title "Large Text Import" \
+  '{path:$path,title:$title,content:.,description:"imported raw text",is_private:false,tags:["import"]}' \
+  ./big-input.txt \
+| curl -sS -X POST "http://localhost:8080/pages/upsert" \
+    -H "Content-Type: application/json" \
+    -H "X-Idempotency-Key: large-text-001" \
+    --data @-
+```
 
 - `GET /wikimgr/get?path=<path>&id=<id>` – retrieve a single page by path or ID.
 
@@ -112,18 +124,18 @@ Payload:
 
 ## CLI Helper Script – `scripts/upsert_page.sh`
 
-A small wrapper so you don't need to hand-craft JSON or escape markdown.
+A small wrapper so you don't need to hand-craft JSON or escape large text payloads.
 
 ### Usage
 
 ```bash
-scripts/upsert_page.sh <path> <title> <markdown_file> [description] [tags_json] [idempotency_key]
+scripts/upsert_page.sh <path> <title> <text_file> [description] [tags_json] [idempotency_key]
 ```
 
 **Arguments**
 - `<path>` – wiki path; will be normalized/expanded (e.g. `AI/Tools/Ollama` → `artificial-intelligence/tools/ollama`).
 - `<title>` – page title.
-- `<markdown_file>` – path to a local `.md` file to use as `content_md`.
+- `<text_file>` – path to any local text file to use as page content.
 - `[description]` – optional short description (default: empty string).
 - `[tags_json]` – optional JSON array of strings, e.g. `'["backend","fastapi"]'` (default: `[]`).
 - `[idempotency_key]` – optional unique string to make retries safe (default: `cli-upsert-<timestamp>`).
@@ -157,7 +169,7 @@ scripts/upsert_page.sh \
   upsert-wikimgr-002
 ```
 
-> The script uses `jq -Rs` to JSON-escape your markdown automatically, so you can write normal `.md` files and avoid manual escaping.
+> The script uses `jq -Rs` to JSON-escape file content automatically, so large text blocks are sent safely without manual escaping.
 
 ## Makefile Targets
 
@@ -200,13 +212,13 @@ Yes — super straightforward. Two common approaches:
 4. Optionally set environment (`API_URL`, `WIKIMGR_API_KEY`) at the top of the script or via Shortcuts input variables.
 
 ### B) Call the FastAPI directly (macOS/iOS)
-1. **Get File** (markdown) → **Get Contents of File** → variable `MD`.
+1. **Get File** (text source) → **Get Contents of File** → variable `MD`.
 2. **Text** action to build a JSON body with tokens:
    ```json
    {
      "path": "${Path}",
      "title": "${Title}",
-     "content_md": "${MD}",
+     "content": "${MD}",
      "description": "${Description}",
      "is_private": false,
      "tags": ${TagsJSON}

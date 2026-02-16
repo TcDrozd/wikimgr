@@ -62,13 +62,13 @@ def main():
     timestamp = int(time.time())
     path = f"smoke/test-{timestamp}-{uuid.uuid4().hex[:6]}"
     title = "Smoke Test Page"
-    content_md = "# Smoke Test\n\nThis page was created by smoke_test.py"
+    content_text = "# Smoke Test\n\nThis page was created by smoke_test.py"
     description = "smoke test"
 
     payload = {
         "path": path,
         "title": title,
-        "content_md": content_md,
+        "content": content_text,
         "description": description,
         "is_private": False,
         "tags": ["smoke"],
@@ -97,7 +97,7 @@ def main():
         got = r.json()
     except Exception:
         fail(f"get returned non-json: {r.text}")
-    if content_md.strip().splitlines()[0] not in (got.get("content", "") or ""):
+    if content_text.strip().splitlines()[0] not in (got.get("content", "") or ""):
         # simple substring check
         fail(f"get returned content mismatch or empty. got: {got.get('content')!r}")
     ok("wikimgr/get content OK")

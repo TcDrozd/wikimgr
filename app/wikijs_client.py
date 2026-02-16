@@ -156,7 +156,7 @@ class WikiJSClient:
         vars = {
             "path": p.path,
             "title": p.title,
-            "content": p.content_md,
+            "content": p.content or "",
             "desc": desc,
             "isPrivate": p.is_private,
             "locale": os.getenv("WIKIJS_LOCALE", "en"),
@@ -192,7 +192,7 @@ class WikiJSClient:
         vars = {
             "id": page_id,
             "title": p.title,
-            "content": p.content_md,
+            "content": p.content or "",
             "desc": p.description if p.description is not None else "",
             "isPrivate": p.is_private,
             "tags": tags,
@@ -223,5 +223,5 @@ def derive_idempotency_key(payload: PagePayload) -> str:
     h.update(b"\x00")
     h.update(payload.title.encode())
     h.update(b"\x00")
-    h.update(payload.content_md.encode())
+    h.update((payload.content or "").encode())
     return h.hexdigest()

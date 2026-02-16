@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import FastAPI, Depends, Header, HTTPException, Query, status
+from fastapi import FastAPI, Depends, Header, HTTPException, Query, status, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -36,11 +36,13 @@ async def readyz():
 @app.post("/pages/upsert", response_model=UpsertResult)
 async def upsert_page(
     payload: PagePayload,
+    request: Request,
     api_ok: None = Depends(require_api_key),
-    x_idempotency_key: str | None = Header(default=None, convert_underscores=False),
+    x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ):
     client = WikiJSClient.from_env()
-    idem = x_idempotency_key or derive_idempotency_key(payload)
+    legacy_idem = request.headers.get("x_idempotency_key")
+    idem = x_idempotency_key or legacy_idem or derive_idempotency_key(payload)
     try:
         result = await client.upsert_page(payload, idem_key=idem)
         return UpsertResult(id=result["id"], path=result["path"], idempotency_key=idem)
