@@ -1,4 +1,5 @@
 import pytest
+import hashlib
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -95,3 +96,121 @@ def test_upsert_accepts_large_plain_text_block(monkeypatch):
     )
     assert r.status_code == 200
     assert r.json()["id"] == 321
+
+
+def test_upload_enforces_md_extension():
+    r = client.post(
+        "/pages/upload",
+        data={"path": "AI/Tools/Ollama", "title": "Ollama"},
+        files={"file": ("note.txt", b"# Hello", "text/plain")},
+    )
+    assert r.status_code == 400
+    assert ".md extension" in r.json()["detail"]
+
+
+def test_upload_enforces_utf8():
+    r = client.post(
+        "/pages/upload",
+        data={"path": "AI/Tools/Ollama", "title": "Ollama"},
+        files={"file": ("note.md", b"\xff\xfe\xfa", "text/markdown")},
+    )
+    assert r.status_code == 400
+    assert "UTF-8" in r.json()["detail"]
+
+
+def test_upload_parses_tags_json(monkeypatch):
+    seen = {}
+
+    async def fake_upsert_page(self, payload, idem_key):
+        seen["tags"] = payload.tags
+        return {"id": 11, "path": payload.path}
+
+    from app import wikijs_client
+
+    monkeypatch.setattr(wikijs_client.WikiJSClient, "upsert_page", fake_upsert_page)
+
+    r = client.post(
+        "/pages/upload",
+        data={"path": "AI/Tools/Ollama", "title": "Ollama", "tags": '["a","b"]'},
+        files={"file": ("note.md", b"# Hello", "text/markdown")},
+    )
+    assert r.status_code == 200
+    assert seen["tags"] == ["a", "b"]
+
+
+def test_upload_parses_tags_csv(monkeypatch):
+    seen = {}
+
+    async def fake_upsert_page(self, payload, idem_key):
+        seen["tags"] = payload.tags
+        return {"id": 12, "path": payload.path}
+
+    from app import wikijs_client
+
+    monkeypatch.setattr(wikijs_client.WikiJSClient, "upsert_page", fake_upsert_page)
+
+    r = client.post(
+        "/pages/upload",
+        data={"path": "AI/Tools/Ollama", "title": "Ollama", "tags": "a, b ,c"},
+        files={"file": ("note.md", b"# Hello", "text/markdown")},
+    )
+    assert r.status_code == 200
+    assert seen["tags"] == ["a", "b", "c"]
+
+
+def test_upload_idempotency_generation_is_deterministic(monkeypatch):
+    seen = {}
+
+    async def fake_upsert_page(self, payload, idem_key):
+        seen["idem"] = idem_key
+        return {"id": 13, "path": payload.path}
+
+    from app import wikijs_client
+
+    monkeypatch.setattr(wikijs_client.WikiJSClient, "upsert_page", fake_upsert_page)
+    content = "# Hello"
+
+    r = client.post(
+        "/pages/upload",
+        data={"path": "AI/Tools/Ollama", "title": "Ollama"},
+        files={"file": ("note.md", content.encode("utf-8"), "text/markdown")},
+    )
+    assert r.status_code == 200
+    expected = hashlib.sha256(b"AI/Tools/Ollama\x00Ollama\x00# Hello").hexdigest()
+    assert seen["idem"] == expected
+    assert r.json()["idempotency_key"] == expected
+
+
+def test_upload_hits_internal_upsert(monkeypatch):
+    seen = {}
+
+    async def fake_upsert_page(self, payload, idem_key):
+        seen["path"] = payload.path
+        seen["title"] = payload.title
+        seen["content_md"] = payload.content_md
+        seen["is_private"] = payload.is_private
+        seen["idem"] = idem_key
+        return {"id": 14, "path": payload.path}
+
+    from app import wikijs_client
+
+    monkeypatch.setattr(wikijs_client.WikiJSClient, "upsert_page", fake_upsert_page)
+
+    r = client.post(
+        "/pages/upload",
+        headers={"X-Idempotency-Key": "header-idem-1"},
+        data={
+            "path": "AI/Tools/Ollama",
+            "title": "Ollama",
+            "description": "desc",
+            "is_private": "yes",
+            "idempotency_key": "form-idem-ignored",
+        },
+        files={"file": ("note.md", b"# Hello", "text/markdown")},
+    )
+    assert r.status_code == 200
+    assert seen["path"] == "AI/Tools/Ollama"
+    assert seen["title"] == "Ollama"
+    assert seen["content_md"] == "# Hello"
+    assert seen["is_private"] is True
+    assert seen["idem"] == "header-idem-1"

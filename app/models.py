@@ -44,6 +44,31 @@ class UpsertResult(BaseModel):
     path: str
     idempotency_key: str
 
+
+class UploadPageResult(BaseModel):
+    ok: bool = True
+    idempotency_key: str
+    page: UpsertResult
+
+
+class BulkUploadSuccess(BaseModel):
+    filename: str
+    idempotency_key: str
+    page: UpsertResult
+
+
+class BulkUploadFailure(BaseModel):
+    filename: str
+    reason: str
+
+
+class BulkUploadResult(BaseModel):
+    ok: bool
+    base_path: str
+    successes: list[BulkUploadSuccess] = Field(default_factory=list)
+    failures: list[BulkUploadFailure] = Field(default_factory=list)
+
+
 class DeleteReq(BaseModel):
     path: Optional[str] = None
     id: Optional[int] = None

@@ -2,7 +2,7 @@
 [project]
 name = "wikimgr"
 version = "0.2.0"
-dependencies = ["fastapi", "uvicorn[standard]", "httpx", "pydantic"]
+dependencies = ["fastapi", "uvicorn[standard]", "httpx", "pydantic", "python-multipart"]
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]

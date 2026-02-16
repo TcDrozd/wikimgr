@@ -4,6 +4,7 @@ This document reflects the current `wikimgr` service behavior.
 
 ## Common Headers
 - `Content-Type: application/json` for JSON endpoints.
+- `Content-Type: multipart/form-data` for upload endpoints.
 - `X-API-Key: <value>` optional, only required when `WIKIMGR_API_KEY` is set.
 - `X-Idempotency-Key: <value>` optional for `POST /pages/upsert`.
 - Legacy compatibility: `x_idempotency_key` (underscore) is also accepted.
@@ -73,6 +74,48 @@ Errors:
 - `502` upstream GraphQL error.
 - `504` upstream network error.
 
+## Upload Markdown
+
+### `POST /pages/upload`
+Upsert a page from a multipart `.md` upload.
+
+Headers:
+- `Content-Type: multipart/form-data`
+- `X-API-Key` (optional)
+- `X-Idempotency-Key` (optional, preferred over form `idempotency_key`)
+
+Form fields:
+- `file` required (`.md`, UTF-8 only)
+- `path` required
+- `title` required
+- `description` optional (default `""`)
+- `tags` optional (`["a","b"]` JSON list string or CSV `a,b`)
+- `is_private` optional truthy string (`1,true,yes,on`)
+- `idempotency_key` optional (used when header is absent)
+
+Response `200`:
+```json
+{
+  "ok": true,
+  "idempotency_key": "derived-or-provided-key",
+  "page": {
+    "id": 123,
+    "path": "automation/services/wikimgr",
+    "idempotency_key": "derived-or-provided-key"
+  }
+}
+```
+
+Notes:
+- If idempotency key is missing, service computes `sha256(path + "\\0" + title + "\\0" + content_md)`.
+- `tags` parsing: valid JSON list is accepted; otherwise value is parsed as CSV.
+
+Errors:
+- `400` missing/invalid fields, invalid extension, invalid UTF-8, invalid tags JSON type.
+- `401` API key invalid/missing (when enabled).
+- `413` payload too large (enforced by runtime/proxy config).
+- `422` malformed multipart/form-data shape (FastAPI request validation).
+
 ## Read / Delete Helpers
 
 ### `GET /wikimgr/get`
@@ -95,6 +138,12 @@ Response `200`:
   "content": "# ...markdown..."
 }
 ```
+
+Errors:
+- `400` bad file inputs (missing files/base_path, invalid extension/UTF-8 per file metadata checks).
+- `401` API key invalid/missing (when enabled).
+- `413` payload too large (enforced by runtime/proxy config).
+- `422` malformed multipart/form-data shape (FastAPI request validation).
 
 Errors:
 - `404` page not found
@@ -189,6 +238,45 @@ Response:
 {
   "updated": ["docs/new/path"],
   "errors": []
+}
+```
+
+### `POST /pages/bulk_upload`
+Bulk upsert from multipart markdown files.
+
+Headers:
+- `Content-Type: multipart/form-data`
+- `X-API-Key` (optional)
+
+Form fields:
+- `files` required (one or more `.md` files, UTF-8)
+- `base_path` required
+- `description` optional shared description
+- `tags` optional shared tags (JSON list string or CSV)
+- `is_private` optional shared truthy string
+
+Per-file behavior:
+- `title` derived from filename stem.
+- `path` derived as `base_path/title`.
+- idempotency key derived as `sha256(path + "\\0" + title + "\\0" + content_md)`.
+
+Response `200`:
+```json
+{
+  "ok": true,
+  "base_path": "imports/notes",
+  "successes": [
+    {
+      "filename": "readme.md",
+      "idempotency_key": "abc123...",
+      "page": {
+        "id": 123,
+        "path": "imports/notes/readme",
+        "idempotency_key": "abc123..."
+      }
+    }
+  ],
+  "failures": []
 }
 ```
 

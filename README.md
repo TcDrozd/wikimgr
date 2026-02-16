@@ -26,6 +26,7 @@ curl -s http://localhost:8080/readyz
 ### Single Page Operations
 
 - `POST /pages/upsert` – create or update a page by path.
+- `POST /pages/upload` – upload a markdown file (`multipart/form-data`) and upsert a page.
 
 Payload:
 ```json
@@ -73,6 +74,48 @@ Payload:
 }
 ```
 
+#### Upload Markdown Page (`POST /pages/upload`)
+
+Multipart form fields:
+- `file` (required): markdown file, must end with `.md`, must decode as UTF-8.
+- `path` (required): target page path.
+- `title` (required): page title.
+- `description` (optional, default `""`).
+- `tags` (optional): either JSON list string (`["a","b"]`) or CSV (`a,b`).
+- `is_private` (optional): truthy values `1,true,yes,on` (case-insensitive).
+- `idempotency_key` (optional): form-level key.
+
+Headers:
+- Optional `X-Idempotency-Key` (takes precedence over form `idempotency_key`).
+- Optional `X-API-Key` when API key auth is enabled.
+
+Behavior:
+- If no idempotency key is provided, wikimgr computes:
+  `sha256(path + "\\0" + title + "\\0" + content_md)`.
+- Returns:
+```json
+{
+  "ok": true,
+  "idempotency_key": "<key>",
+  "page": {
+    "id": 123,
+    "path": "automation/services/wikimgr",
+    "idempotency_key": "<key>"
+  }
+}
+```
+
+Example:
+```bash
+curl -sS -X POST "http://localhost:8080/pages/upload" \
+  -H "X-Idempotency-Key: upload-001" \
+  -F "path=automation/services/wikimgr" \
+  -F "title=Wiki Manager Service (wikimgr)" \
+  -F "description=uploaded markdown source" \
+  -F "tags=[\"backend\",\"fastapi\"]" \
+  -F "file=@wikimgr.md;type=text/markdown"
+```
+
 ### Bulk Operations
 
 - `GET /wikimgr/pages/inventory.json?include_content=false` – list all pages with metadata.
@@ -113,6 +156,33 @@ Payload:
 ```
 
 - `POST /wikimgr/pages/bulk-relink` – update internal markdown links after bulk moves.
+
+- `POST /pages/bulk_upload` – upload multiple markdown files in one request.
+
+#### Bulk Upload Markdown (`POST /pages/bulk_upload`)
+
+Multipart form fields:
+- `files` (required): one or more `.md` files.
+- `base_path` (required): each file maps to `base_path/<filename-without-ext>`.
+- `description` (optional shared description).
+- `tags` (optional shared tags, JSON list string or CSV).
+- `is_private` (optional shared truthy string).
+
+Returns structured results:
+```json
+{
+  "ok": true,
+  "base_path": "automation/services/imports",
+  "successes": [
+    {
+      "filename": "wikimgr.md",
+      "idempotency_key": "<key>",
+      "page": {"id": 123, "path": "automation/services/imports/wikimgr", "idempotency_key": "<key>"}
+    }
+  ],
+  "failures": []
+}
+```
 
 Payload:
 ```json
