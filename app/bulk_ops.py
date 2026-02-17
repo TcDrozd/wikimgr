@@ -16,10 +16,15 @@ UPSERT_URL = os.getenv("WKMGR_UPSERT_URL", f"{WKMGR_BASE_URL}/pages/upsert")
 GET_URL    = os.getenv("WKMGR_GET_URL",    f"{WKMGR_BASE_URL}/wikimgr/get")
 DELETE_URL = os.getenv("WKMGR_DELETE_URL", f"{WKMGR_BASE_URL}/wikimgr/delete")
 
-# Optional bearer for your wikimgr internal API
+# Optional auth for internal wikimgr API hops made by bulk endpoints.
 AUTH_BEARER = os.getenv("WKMGR_BEARER", "")
+AUTH_API_KEY = os.getenv("WKMGR_API_KEY", os.getenv("WIKIMGR_API_KEY", ""))
 
-HEADERS = {"Authorization": f"Bearer {AUTH_BEARER}"} if AUTH_BEARER else {}
+HEADERS: Dict[str, str] = {}
+if AUTH_BEARER:
+    HEADERS["Authorization"] = f"Bearer {AUTH_BEARER}"
+if AUTH_API_KEY:
+    HEADERS["X-API-Key"] = AUTH_API_KEY
 
 # ---- Helpers to talk to your existing endpoints ----
 async def get_page(path: str) -> Dict:
@@ -173,6 +178,11 @@ async def bulk_relink(body: Dict):
     """
     mapping: Dict[str, str] = body.get("mapping") or {}
     scope = body.get("scope", "all")
+    normalized_mapping = {
+        str(k).strip("/"): str(v).strip("/")
+        for k, v in mapping.items()
+        if str(k).strip("/") and str(v).strip("/")
+    }
 
     if not mapping:
         # allow empty mapping for now (no-ops) so you can test wiring
@@ -192,7 +202,15 @@ async def bulk_relink(body: Dict):
         r = await c.get(INV_URL, headers=HEADERS)
         if r.is_error:
             raise HTTPException(500, f"inventory fetch failed: {r.status_code} {r.text}")
-        pages = r.json()
+        inventory_payload = r.json()
+        if isinstance(inventory_payload, dict):
+            pages = inventory_payload.get("pages") or []
+        elif isinstance(inventory_payload, list):
+            pages = inventory_payload
+        else:
+            raise HTTPException(500, "inventory payload must be an object or list")
+        if not isinstance(pages, list):
+            raise HTTPException(500, "inventory payload 'pages' must be a list")
 
     report = {"updated": [], "errors": []}
     for p in pages:
@@ -212,7 +230,7 @@ async def bulk_relink(body: Dict):
             if not cur:
                 continue
             content = cur.get("content") or ""
-            new_md = rewrite_links(content, mapping)
+            new_md = rewrite_links(content, normalized_mapping)
             if new_md != content:
                 await upsert_page(path, title=cur.get("title") or path.split("/")[-1], content=new_md, description=cur.get("description") or "")
                 report["updated"].append(path)
