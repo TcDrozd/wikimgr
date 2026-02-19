@@ -7,18 +7,6 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-WIKIJS_BASE_URL = os.getenv("WIKIJS_BASE_URL", "")
-GRAPHQL_URL = f"{WIKIJS_BASE_URL.rstrip('/')}/graphql"
-WIKIJS_API_TOKEN = os.getenv("WIKIJS_API_TOKEN", "")
-
-HEADERS = {
-    "Authorization": f"Bearer {WIKIJS_API_TOKEN}" if WIKIJS_API_TOKEN else "",
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-}
-if not HEADERS["Authorization"]:
-    HEADERS.pop("Authorization", None)
-
 # Queries
 QUERY_LIST = """{ pages { list(orderBy: TITLE) { id path title } } }"""
 
@@ -58,12 +46,31 @@ mutation Del($id:Int!) {
 }
 """
 
+def _graphql_url() -> str:
+    base_url = os.getenv("WIKIJS_BASE_URL", "").rstrip("/")
+    if not base_url:
+        raise RuntimeError("WIKIJS_BASE_URL is not set")
+    if not (base_url.startswith("http://") or base_url.startswith("https://")):
+        raise RuntimeError("WIKIJS_BASE_URL must start with http:// or https://")
+    return f"{base_url}/graphql"
+
+
+def _headers() -> dict[str, str]:
+    token = os.getenv("WIKIJS_API_TOKEN", "")
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
 
 def _post(query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     with httpx.Client(timeout=60) as c:
         r = c.post(
-            GRAPHQL_URL,
-            headers=HEADERS,
+            _graphql_url(),
+            headers=_headers(),
             json={"query": query, "variables": variables or {}},
         )
     r.raise_for_status()

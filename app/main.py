@@ -2,15 +2,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+load_dotenv()
+
 from app.core.errors import APIError
 from app.routers.api import api_router
 from .log_utils import inject_request_id, setup_logging
 from .models import ErrorResponse
 from .routers.content import router as content_router
 from .routers.legacy import router as legacy_router
-
-
-load_dotenv()
 
 app = FastAPI(title="Wiki Manager", version="0.2.0")
 setup_logging()
