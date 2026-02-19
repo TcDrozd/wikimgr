@@ -6,5 +6,5 @@ from app.routers.pages import router as pages_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
-api_router.include_router(pages_router)
 api_router.include_router(bulk_router)
+api_router.include_router(pages_router)

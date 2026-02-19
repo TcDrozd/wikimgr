@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.core.path_policy import enforce_path_policy, normalize_path
 from app.main import app
-from app.models import UpsertPageRequest
+from app.models import InventoryResponse, UpsertPageRequest
 
 
 client = TestClient(app)
@@ -76,3 +76,22 @@ def test_legacy_deprecation_headers():
     assert r.status_code == 200
     assert r.headers["Deprecation"] == "true"
     assert r.headers["Link"] == '</api/v1/health>; rel="successor-version"'
+
+
+def test_inventory_route_not_captured_by_id_route(monkeypatch):
+    from app.routers import bulk as bulk_router
+
+    monkeypatch.setattr(
+        bulk_router,
+        "inventory",
+        lambda include_content=False: InventoryResponse(count=0, pages=[]),
+    )
+
+    r = client.get("/api/v1/pages/inventory")
+    assert r.status_code == 200
+    assert r.json()["count"] == 0
+
+
+def test_non_int_page_id_returns_404_not_validation_error():
+    r = client.get("/api/v1/pages/inventory-not-an-id")
+    assert r.status_code == 404

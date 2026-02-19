@@ -51,7 +51,7 @@ def get_page_by_path(path: str = Query(..., description="Wiki page path")) -> Ge
 
 
 @router.get(
-    "/{id}",
+    "/{id:int}",
     response_model=GetPageResponse,
     responses=ERROR_RESPONSES,
 )
@@ -60,7 +60,7 @@ def get_page_by_id(id: int) -> GetPageResponse:
 
 
 @router.delete(
-    "/{id}",
+    "/{id:int}",
     response_model=DeletePageResponse,
     responses=ERROR_RESPONSES,
 )
