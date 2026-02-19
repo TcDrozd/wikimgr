@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.paths import configured_allowed_roots, preflight_analysis
+from app.deps import require_api_key_legacy
 from app.content_tree import build_tree, render_tree_text
 from app.models import ContentTreeResult, PreflightReq, PreflightResult
 from app.wikijs_api import list_pages
 
-router = APIRouter(prefix="/content", tags=["content"])
+router = APIRouter(
+    prefix="/content",
+    tags=["content"],
+    dependencies=[Depends(require_api_key_legacy)],
+)
 
 
 @router.get("/tree", response_model=ContentTreeResult)

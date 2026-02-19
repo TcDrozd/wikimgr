@@ -26,6 +26,9 @@ curl -s http://localhost:8080/readyz
 
 ## API
 
+Canonical API reference lives in `docs/api.md` and uses `/api/v1` endpoints.
+Legacy routes are still available with deprecation headers for migration.
+
 ### Single Page Operations
 
 - `POST /pages/upsert` – create or update a page by path.
