@@ -60,9 +60,15 @@ __pypackages__/
 .env.*
 !.env.example
 *.envrc
+.direnv/
+.python-version
 *.pem
 *.key
 *.crt
+*.p12
+*.pfx
+*.ovpn
+*.mobileconfig
 
 # Docker
 # (Generated volumes, local bind-mount scratch, etc.)
@@ -80,3 +86,14 @@ junit*.xml
 
 # Update and re-build script
 deploy_update.sh
+
+# Infra / local state
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+
+# Merge/editor leftovers
+*.orig
+*.bak

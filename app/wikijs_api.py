@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-WIKIJS_BASE_URL = os.getenv("WIKIJS_BASE_URL", "http://192.168.50.208:3000")
+WIKIJS_BASE_URL = os.getenv("WIKIJS_BASE_URL", "")
 GRAPHQL_URL = f"{WIKIJS_BASE_URL.rstrip('/')}/graphql"
 WIKIJS_API_TOKEN = os.getenv("WIKIJS_API_TOKEN", "")
 
