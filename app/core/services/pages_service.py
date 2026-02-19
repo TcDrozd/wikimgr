@@ -10,7 +10,6 @@ from app.models import (
     UpsertPageRequest,
     UpsertPageResponse,
 )
-from app.services.upload_service import execute_upsert
 from app.wikijs_client import derive_idempotency_key
 from app.wikijs_api import delete_by_id, get_single, resolve_id
 
@@ -36,7 +35,8 @@ async def upsert_page(
     idem = resolve_idempotency_key(payload, x_idempotency_key, legacy_x_idempotency_key)
     page_payload = PagePayload(**payload.model_dump())
     try:
-        result = await execute_upsert(page_payload, idem, client=WikiJSClient.from_env())
+        wikijs_client = WikiJSClient.from_env()
+        result = await wikijs_client.upsert_page(page_payload, idem_key=idem)
     except WikiError as e:
         upstream = map_wiki_error(e)
         raise APIError(upstream.status_code, "upstream_error", upstream.message)
@@ -44,7 +44,7 @@ async def upsert_page(
         raise
     except Exception as e:
         raise APIError(502, "upstream_error", str(e))
-    return UpsertPageResponse(**result.model_dump())
+    return UpsertPageResponse(id=result["id"], path=result["path"], idempotency_key=idem)
 
 
 def get_page(path: str | None = None, id: int | None = None) -> GetPageResponse:
