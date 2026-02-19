@@ -20,205 +20,52 @@ export $(cat .env | xargs) # or use `direnv`
 make dev    # uvicorn app.main:app --reload --port 8080
 
 # 4) Health checks
-curl -s http://localhost:8080/healthz
-curl -s http://localhost:8080/readyz
+curl -s http://localhost:8080/api/v1/health
+curl -s http://localhost:8080/api/v1/ready
 ```
 
 ## API
 
-Canonical API reference lives in `docs/api.md` and uses `/api/v1` endpoints.
-Legacy routes are still available with deprecation headers for migration.
+Canonical API is versioned under `/api/v1`.
 
-### Single Page Operations
+- Full reference: `docs/api.md`
+- Quick endpoint examples: `wiki-endpoints.md`
 
-- `POST /pages/upsert` – create or update a page by path.
-- `POST /pages/upload` – upload a markdown file (`multipart/form-data`) and upsert a page.
-- `GET /content/tree` – read-only tree overview of current wiki paths.
-- `POST /content/preflight` – validate/normalize a raw path against canonical roots and get suggestions.
+Canonical endpoints:
+- `GET /api/v1/health`
+- `GET /api/v1/ready`
+- `POST /api/v1/pages/upsert`
+- `GET /api/v1/pages?path=...`
+- `GET /api/v1/pages/{id}`
+- `DELETE /api/v1/pages?path=...`
+- `DELETE /api/v1/pages/{id}`
+- `POST /api/v1/pages/bulk-move`
+- `POST /api/v1/pages/bulk-redirect`
+- `POST /api/v1/pages/bulk-relink`
+- `GET /api/v1/pages/inventory`
 
-Payload:
-```json
-{
-  "path": "automation/services/wikimgr",
-  "title": "Wiki Manager Service (wikimgr)",
-  "content": "Any large text block (markdown, plain text, logs, etc.)",
-  "description": "Short summary",
-  "is_private": false,
-  "tags": ["backend","fastapi","automation"]
-}
-```
+Compatibility endpoints (deprecated, still supported):
+- `GET /healthz`
+- `GET /readyz`
+- `POST /pages/upsert`
+- `POST /pages/upload`
+- `POST /pages/bulk_upload`
+- `GET /wikimgr/get`
+- `POST /wikimgr/delete`
+- `GET /wikimgr/health`
+- `POST /wikimgr/pages/bulk-move`
+- `POST /wikimgr/pages/bulk-redirect`
+- `POST /wikimgr/pages/bulk-relink`
+- `GET /wikimgr/pages/inventory.json`
 
-Headers:
-- Optional: `X-API-Key: <value>` (if `WIKIMGR_API_KEY` is set)
-- Optional: `X-Idempotency-Key: any-unique-string`
+Legacy responses include migration headers:
+- `Deprecation: true`
+- `Link: </api/v1/...>; rel="successor-version"`
 
-Notes:
-- Path is normalized to lowercase, spaces→`-`, and each segment must be ≥ 3 chars. Common short segments are expanded (e.g. `ai`→`artificial-intelligence`).
-- Locale comes from `WIKIJS_LOCALE` (default `en`).
-- Tags are required by the Wiki.js schema; if not provided, an empty list is sent.
-- `content` is the preferred field for page text. `content_md` is still accepted for backward compatibility.
-
-Canonical preflight normalization rules (`/content/preflight`):
-- Strip surrounding whitespace.
-- Ensure leading `/`.
-- Collapse repeated `/`.
-- Per segment: lowercase, spaces/underscores to `-`, non `[a-z0-9-]` replaced, repeated `-` collapsed, trim `-`.
-- No trailing slash unless root (`/`).
-- Allowed roots come from `WIKIMGR_ALLOWED_ROOTS` (default: `homelab,projects,ai,personal,community,meta`).
-
-Example (send a large text file as page content):
-```bash
-jq -Rs --arg path "notes/imports/large-text" --arg title "Large Text Import" \
-  '{path:$path,title:$title,content:.,description:"imported raw text",is_private:false,tags:["import"]}' \
-  ./big-input.txt \
-| curl -sS -X POST "http://localhost:8080/pages/upsert" \
-    -H "Content-Type: application/json" \
-    -H "X-Idempotency-Key: large-text-001" \
-    --data @-
-```
-
-Example tree call:
-```bash
-curl -sS "http://localhost:8080/content/tree" | jq
-```
-
-Example preflight call:
-```bash
-curl -sS -X POST "http://localhost:8080/content/preflight" \
-  -H "Content-Type: application/json" \
-  -d '{"path":"/Infra/Proxmox/GPU VM"}' | jq
-```
-
-- `GET /wikimgr/get?path=<path>&id=<id>` – retrieve a single page by path or ID.
-
-- `POST /wikimgr/delete` – delete a page (soft delete creates a redirect stub).
-
-Payload:
-```json
-{
-  "path": "old/path",
-  "id": 123,
-  "soft": true
-}
-```
-
-#### Upload Markdown Page (`POST /pages/upload`)
-
-Multipart form fields:
-- `file` (required): markdown file, must end with `.md`, must decode as UTF-8.
-- `path` (required): target page path.
-- `title` (required): page title.
-- `description` (optional, default `""`).
-- `tags` (optional): either JSON list string (`["a","b"]`) or CSV (`a,b`).
-- `is_private` (optional): truthy values `1,true,yes,on` (case-insensitive).
-- `idempotency_key` (optional): form-level key.
-
-Headers:
-- Optional `X-Idempotency-Key` (takes precedence over form `idempotency_key`).
-- Optional `X-API-Key` when API key auth is enabled.
-
-Behavior:
-- If no idempotency key is provided, wikimgr computes:
-  `sha256(path + "\\0" + title + "\\0" + content_md)`.
-- Returns:
-```json
-{
-  "ok": true,
-  "idempotency_key": "<key>",
-  "page": {
-    "id": 123,
-    "path": "automation/services/wikimgr",
-    "idempotency_key": "<key>"
-  }
-}
-```
-
-Example:
-```bash
-curl -sS -X POST "http://localhost:8080/pages/upload" \
-  -H "X-Idempotency-Key: upload-001" \
-  -F "path=automation/services/wikimgr" \
-  -F "title=Wiki Manager Service (wikimgr)" \
-  -F "description=uploaded markdown source" \
-  -F "tags=[\"backend\",\"fastapi\"]" \
-  -F "file=@wikimgr.md;type=text/markdown"
-```
-
-### Bulk Operations
-
-- `GET /wikimgr/pages/inventory.json?include_content=false` – list all pages with metadata.
-
-Returns:
-```json
-{
-  "count": 42,
-  "pages": [
-    {"id": 1, "path": "example", "title": "Example", "description": "..."}
-  ]
-}
-```
-
-- `POST /wikimgr/pages/bulk-move` – move multiple pages, optionally merging or creating redirects.
-
-Payload:
-```json
-{
-  "moves": [
-    {"from_path": "old/path", "to_path": "new/path", "merge": false}
-  ],
-  "dry_run": true
-}
-```
-
-Returns detailed report of applied/skipped/errors.
-
-- `POST /wikimgr/pages/bulk-redirect` – create redirect stubs for moved paths.
-
-Payload:
-```json
-{
-  "redirects": [
-    {"from_path": "old/path", "to_path": "new/path"}
-  ]
-}
-```
-
-- `POST /wikimgr/pages/bulk-relink` – update internal markdown links after bulk moves.
-
-- `POST /pages/bulk_upload` – upload multiple markdown files in one request.
-
-#### Bulk Upload Markdown (`POST /pages/bulk_upload`)
-
-Multipart form fields:
-- `files` (required): one or more `.md` files.
-- `base_path` (required): each file maps to `base_path/<filename-without-ext>`.
-- `description` (optional shared description).
-- `tags` (optional shared tags, JSON list string or CSV).
-- `is_private` (optional shared truthy string).
-
-Returns structured results:
-```json
-{
-  "ok": true,
-  "base_path": "automation/services/imports",
-  "successes": [
-    {
-      "filename": "wikimgr.md",
-      "idempotency_key": "<key>",
-      "page": {"id": 123, "path": "automation/services/imports/wikimgr", "idempotency_key": "<key>"}
-    }
-  ],
-  "failures": []
-}
-```
-
-Payload:
-```json
-{
-  "mapping": {"old/path": "new/path"},
-  "scope": "all"
-}
-```
+Auth and idempotency:
+- If `WIKIMGR_API_KEY` is set, all non-health endpoints require `X-API-Key`.
+- Upsert accepts both `X-Idempotency-Key` and legacy `x_idempotency_key`.
+- Path policy behavior is unchanged: normalized lowercase/hyphenated paths and segment minimum length after expansions (for example `ai` -> `artificial-intelligence`).
 
 ## CLI Helper Script – `scripts/upsert_page.sh`
 
@@ -322,7 +169,7 @@ Yes — super straightforward. Two common approaches:
      "tags": ${TagsJSON}
    }
    ```
-3. **Get Contents of URL** → POST `http://localhost:8080/pages/upsert` (or your host) with headers:
+3. **Get Contents of URL** → POST `http://localhost:8080/api/v1/pages/upsert` (or your host) with headers:
    - `Content-Type: application/json`
    - `X-API-Key: ${WIKIMGR_API_KEY}` (if used)
    - `X-Idempotency-Key: ${Idem}`
